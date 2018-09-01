@@ -3,4 +3,7 @@
     <string name="input_url">Type website address</string>
     <string name="download">Download</string>
     <string name="send">Send</string>
+    <string name="go_to_website">go to website</string>
+    <string name="download_video">download video</string>
+    <string name="size_m">%dM</string>
 </resources>

@@ -1,18 +1,34 @@
 package com.billin.www.videodownloader
 
+import android.animation.Animator
 import android.annotation.SuppressLint
 import android.app.DownloadManager
 import android.content.Context
+import android.graphics.Bitmap
+import android.graphics.Color
+import android.graphics.PorterDuff
+import android.graphics.PorterDuffColorFilter
 import android.net.Uri
 import android.os.Bundle
 import android.os.Environment
+import android.os.Handler
+import android.os.HandlerThread
 import android.support.v7.app.AppCompatActivity
+import android.view.View
 import android.webkit.WebChromeClient
 import android.webkit.WebSettings
 import android.webkit.WebView
 import android.widget.Button
 import android.widget.EditText
+import android.widget.ImageButton
+import android.widget.ProgressBar
+import java.net.MalformedURLException
+import java.net.URL
+import java.util.*
 
+/**
+ * todo 添加点击返回按钮回退上一页
+ */
 class MainActivity : AppCompatActivity() {
 
     private companion object {
@@ -49,9 +65,90 @@ class MainActivity : AppCompatActivity() {
 
     private val mDownloadButton: Button by lazy { findViewById<Button>(R.id.main_download_button) }
 
-    private val mSendButton: Button by lazy { findViewById<Button>(R.id.main_send) }
+    private val mSendButton: ImageButton by lazy { findViewById<ImageButton>(R.id.main_send) }
 
-    private val mWebClient: CacheWebClient by lazy { CacheWebClient() }
+    private val mWebClient: CacheWebClient by lazy {
+        val client = object : CacheWebClient() {
+            override fun onPageStarted(view: WebView, p1: String?, p2: Bitmap?) {
+                super.onPageStarted(view, p1, p2)
+
+                mDownloadButton.compoundDrawables[0].colorFilter = PorterDuffColorFilter(Color.GRAY, PorterDuff.Mode.SRC_IN)
+                mDownloadButton.animate().rotation(0f).setListener(object : Animator.AnimatorListener {
+                    override fun onAnimationRepeat(animation: Animator?) {
+
+                    }
+
+                    override fun onAnimationStart(animation: Animator?) {
+
+                    }
+
+                    override fun onAnimationEnd(animation: Animator?) {
+                        mDownloadButton.compoundDrawables[0].colorFilter = PorterDuffColorFilter(Color.GRAY, PorterDuff.Mode.SRC_IN)
+                        mDownloadButton.text = ""
+                    }
+
+                    override fun onAnimationCancel(animation: Animator?) {
+                        mDownloadButton.compoundDrawables[0].colorFilter = PorterDuffColorFilter(Color.GRAY, PorterDuff.Mode.SRC_IN)
+                        mDownloadButton.text = ""
+                    }
+                }).start()
+                mInputView.setText(view.url)
+            }
+        }
+
+        client.videoCatchListener = { _, videoUrl ->
+            mDownloadButton.animate().cancel()
+            mDownloadButton.animate().rotation(360f).setListener(object : Animator.AnimatorListener {
+                override fun onAnimationRepeat(animation: Animator?) {
+
+                }
+
+                override fun onAnimationStart(animation: Animator?) {
+
+                }
+
+                override fun onAnimationEnd(animation: Animator?) {
+                    mDownloadButton.compoundDrawables[0].colorFilter = PorterDuffColorFilter(Color.RED, PorterDuff.Mode.SRC_IN)
+                }
+
+                override fun onAnimationCancel(animation: Animator?) {
+                    mDownloadButton.compoundDrawables[0].colorFilter = PorterDuffColorFilter(Color.GRAY, PorterDuff.Mode.SRC_IN)
+                }
+            }).start()
+
+            mAsyncHandler.post {
+                var size = 0L
+                try {
+                    val connection = URL(videoUrl).openConnection()
+                    connection.connect()
+                    val length = connection.getHeaderField("content-length")
+                    try {
+                        size = length.toLong() / 1024 / 1024
+                    } catch (ignore: Exception) {
+                    }
+                } catch (ignore: MalformedURLException) {
+                    // nothing to do
+                }
+
+                runOnUiThread {
+                    if (size != 0L)
+                        mDownloadButton.text = String.format(Locale.US, getString(R.string.size_m), size)
+                    else
+                        mDownloadButton.text = ""
+                }
+            }
+        }
+
+        client
+    }
+
+    private val mProgress: ProgressBar by lazy { findViewById<ProgressBar>(R.id.main_progress) }
+
+    private val mAsyncHandler: Handler by lazy {
+        val thread = HandlerThread("Load mp4 thread")
+        thread.start()
+        Handler(thread.looper)
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -59,9 +156,13 @@ class MainActivity : AppCompatActivity() {
         initWebView()
 
         mSendButton.setOnClickListener {
-            val url = mInputView.text.trim()
-            if (!url.isBlank())
+            var url = mInputView.text.trim()
+            if (!url.isBlank()) {
+                if (!url.startsWith("http"))
+                    url = "http://$url"
+
                 mWebView.loadUrl(url.toString())
+            }
         }
 
         mDownloadButton.setOnClickListener {
@@ -87,7 +188,17 @@ class MainActivity : AppCompatActivity() {
         mWebView.settings.allowContentAccess = true
         mWebView.settings.pluginState = WebSettings.PluginState.ON
         mWebView.settings.domStorageEnabled = true
-        mWebView.webChromeClient = WebChromeClient()
+        mWebView.webChromeClient = object : WebChromeClient() {
+            override fun onProgressChanged(view: WebView?, newProgress: Int) {
+                super.onProgressChanged(view, newProgress)
+                if (newProgress == 100) {
+                    mProgress.visibility = View.GONE
+                } else {
+                    mProgress.visibility = View.VISIBLE
+                    mProgress.progress = newProgress
+                }
+            }
+        }
         mWebView.webViewClient = mWebClient
         mWebView.loadUrl(HAO_123)
     }
