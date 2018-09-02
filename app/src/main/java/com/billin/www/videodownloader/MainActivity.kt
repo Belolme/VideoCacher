@@ -96,7 +96,8 @@ class MainActivity : AppCompatActivity() {
                     val connection = URL(videoUrl).openConnection()
                     connection.connect()
                     val length = connection.getHeaderField("content-length")
-                    val type = connection.getHeaderField("Content-Type")if (type.contains("mp4")) {
+                    val type = connection.getHeaderField("Content-Type")
+                    if (type.contains("mp4")) {
                         try {
                             size = length.toLong() / 1024 / 1024
                         } catch (ignore: Exception) {
