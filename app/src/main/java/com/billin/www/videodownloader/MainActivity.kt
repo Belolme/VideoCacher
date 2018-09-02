@@ -73,15 +73,7 @@ class MainActivity : AppCompatActivity() {
                 super.onPageStarted(view, p1, p2)
 
                 mDownloadButton.compoundDrawables[0].colorFilter = PorterDuffColorFilter(Color.GRAY, PorterDuff.Mode.SRC_IN)
-                mDownloadButton.animate().rotation(0f).setListener(object : Animator.AnimatorListener {
-                    override fun onAnimationRepeat(animation: Animator?) {
-
-                    }
-
-                    override fun onAnimationStart(animation: Animator?) {
-
-                    }
-
+                mDownloadButton.animate().rotation(0f).setListener(object : SimpleAnimatorAnimator() {
                     override fun onAnimationEnd(animation: Animator?) {
                         mDownloadButton.compoundDrawables[0].colorFilter = PorterDuffColorFilter(Color.GRAY, PorterDuff.Mode.SRC_IN)
                         mDownloadButton.text = ""
@@ -97,44 +89,51 @@ class MainActivity : AppCompatActivity() {
         }
 
         client.videoCatchListener = { _, videoUrl ->
-            mDownloadButton.animate().cancel()
-            mDownloadButton.animate().rotation(360f).setListener(object : Animator.AnimatorListener {
-                override fun onAnimationRepeat(animation: Animator?) {
-
-                }
-
-                override fun onAnimationStart(animation: Animator?) {
-
-                }
-
-                override fun onAnimationEnd(animation: Animator?) {
-                    mDownloadButton.compoundDrawables[0].colorFilter = PorterDuffColorFilter(Color.RED, PorterDuff.Mode.SRC_IN)
-                }
-
-                override fun onAnimationCancel(animation: Animator?) {
-                    mDownloadButton.compoundDrawables[0].colorFilter = PorterDuffColorFilter(Color.GRAY, PorterDuff.Mode.SRC_IN)
-                }
-            }).start()
-
             mAsyncHandler.post {
+                // 当 size 为 0 的时候，显示不可下载，只有当 size 大于 0 的时候才能下载视频
                 var size = 0L
                 try {
                     val connection = URL(videoUrl).openConnection()
                     connection.connect()
                     val length = connection.getHeaderField("content-length")
-                    try {
-                        size = length.toLong() / 1024 / 1024
-                    } catch (ignore: Exception) {
+                    val type = connection.getHeaderField("Content-Type")if (type.contains("mp4")) {
+                        try {
+                            size = length.toLong() / 1024 / 1024
+                        } catch (ignore: Exception) {
+                        }
                     }
                 } catch (ignore: MalformedURLException) {
                     // nothing to do
                 }
 
                 runOnUiThread {
-                    if (size != 0L)
-                        mDownloadButton.text = String.format(Locale.US, getString(R.string.size_m), size)
-                    else
-                        mDownloadButton.text = ""
+                    if (size != 0L) {
+                        mDownloadButton.animate().cancel()
+                        mDownloadButton.animate().rotation(360f).setListener(object : SimpleAnimatorAnimator() {
+                            override fun onAnimationEnd(animation: Animator?) {
+                                mDownloadButton.text = String.format(Locale.US, getString(R.string.size_m), size)
+                                mDownloadButton.compoundDrawables[0].colorFilter = PorterDuffColorFilter(Color.RED, PorterDuff.Mode.SRC_IN)
+                            }
+
+                            override fun onAnimationCancel(animation: Animator?) {
+                                mDownloadButton.text = String.format(Locale.US, getString(R.string.size_m), size)
+                                mDownloadButton.compoundDrawables[0].colorFilter = PorterDuffColorFilter(Color.GRAY, PorterDuff.Mode.SRC_IN)
+                            }
+                        }).start()
+                    } else {
+                        mDownloadButton.animate().cancel()
+                        mDownloadButton.animate().rotation(0f).setListener(object : SimpleAnimatorAnimator() {
+                            override fun onAnimationEnd(animation: Animator?) {
+                                mDownloadButton.text = ""
+                                mDownloadButton.compoundDrawables[0].colorFilter = PorterDuffColorFilter(Color.GRAY, PorterDuff.Mode.SRC_IN)
+                            }
+
+                            override fun onAnimationCancel(animation: Animator?) {
+                                mDownloadButton.text = ""
+                                mDownloadButton.compoundDrawables[0].colorFilter = PorterDuffColorFilter(Color.GRAY, PorterDuff.Mode.SRC_IN)
+                            }
+                        }).start()
+                    }
                 }
             }
         }
